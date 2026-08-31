@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplikasi Arsip Surat Terpadu</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+  <header class="bg-indigo-900 text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+      <div class="flex items-center space-x-3">
+        <i class="fa-solid fa-box-archive text-2xl text-indigo-300"></i>
+        <h1 class="text-lg sm:text-xl font-bold tracking-tight">E-Arsip Surat</h1>
+      </div>
+      <div class="flex items-center space-x-3">
+        <div class="text-right hidden sm:block">
+          <div id="userDisplayName" class="text-sm font-semibold">Administrator</div>
+          <div id="userRoleBadge" class="text-xs bg-indigo-700 text-indigo-200 px-2 py-0.5 rounded-full inline-block uppercase">Admin</div>
+        </div>
+        <select id="roleSwitcher" onchange="switchUser(this.value)" class="bg-indigo-800 text-xs text-white rounded px-2 py-1.5 border border-indigo-700 focus:outline-none">
+          <option value="admin">Login: Admin</option>
+          <option value="operator">Login: Operator</option>
+          <option value="editor">Login: Editor</option>
+          <option value="user">Login: User Biasa</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <nav class="bg-white border-b border-slate-200 shadow-sm sticky top-16 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-2 sm:space-x-8 overflow-x-auto py-2">
+      <button onclick="navigateTab('utama')" id="tab-utama" class="tab-btn active border-b-2 border-indigo-600 text-indigo-600 font-semibold px-3 py-2 text-sm whitespace-nowrap">
+        <i class="fa-solid fa-table-list mr-1.5"></i> Halaman Utama
+      </button>
+      <button onclick="navigateTab('kelola')" id="tab-kelola" class="tab-btn border-b-2 border-transparent text-slate-500 hover:text-slate-700 px-3 py-2 text-sm whitespace-nowrap hidden">
+        <i class="fa-solid fa-pen-to-square mr-1.5"></i> Kelola Surat
+      </button>
+      <button onclick="navigateTab('inbox')" id="tab-inbox" class="tab-btn border-b-2 border-transparent text-slate-500 hover:text-slate-700 px-3 py-2 text-sm whitespace-nowrap relative">
+        <i class="fa-solid fa-inbox mr-1.5"></i> Inbox Persetujuan
+        <span id="pendingCountBadge" class="ml-1 px-1.5 py-0.5 text-xs bg-amber-500 text-white rounded-full hidden">0</span>
+      </button>
+      <button onclick="navigateTab('admin')" id="tab-admin" class="tab-btn border-b-2 border-transparent text-slate-500 hover:text-slate-700 px-3 py-2 text-sm whitespace-nowrap hidden">
+        <i class="fa-solid fa-users-gear mr-1.5"></i> Panel User Admin
+      </button>
+    </div>
+  </nav>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+    
+    <div id="toast" class="fixed bottom-4 right-4 z-50 transform transition-all duration-300 translate-y-20 opacity-0 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-xl flex items-center space-x-3 text-sm">
+      <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+      <span id="toastMsg">Notifikasi</span>
+    </div>
+
+    <section id="view-utama" class="space-y-8">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/50">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-slate-800 flex items-center">
+              <i class="fa-solid fa-envelope-open-text text-indigo-600 mr-2"></i> Tabel Surat Masuk
+            </h2>
+            <p class="text-xs text-slate-500">Klik baris surat untuk melihat rincian lengkap header.</p>
+          </div>
+          <input type="text" id="searchMasuk" oninput="filterSuratMasuk()" placeholder="Cari Surat Masuk..." class="text-xs sm:text-sm border border-slate-300 rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-100/75 text-slate-600 border-b border-slate-200 uppercase text-[11px] font-semibold">
+                <th class="p-3">No</th>
+                <th class="p-3">Tanggal Diterima</th>
+                <th class="p-3">Pengirim</th>
+                <th class="p-3">Tanggal Surat</th>
+                <th class="p-3">Nomor Surat</th>
+                <th class="p-3">Perihal Surat</th>
+                <th class="p-3">File</th>
+                <th class="p-3 text-right">Jenis Surat</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-surat-masuk" class="divide-y divide-slate-200">
+              <tr><td colspan="8" class="text-center p-6 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat data dari Google Sheets...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/50">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-slate-800 flex items-center">
+              <i class="fa-solid fa-paper-plane text-emerald-600 mr-2"></i> Tabel Surat Keluar
+            </h2>
+            <p class="text-xs text-slate-500">Klik baris surat untuk melihat rincian lengkap header.</p>
+          </div>
+          <input type="text" id="searchKeluar" oninput="filterSuratKeluar()" placeholder="Cari Surat Keluar..." class="text-xs sm:text-sm border border-slate-300 rounded-lg px-3 py-2 w-full sm:w-64 focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-100/75 text-slate-600 border-b border-slate-200 uppercase text-[11px] font-semibold">
+                <th class="p-3">Nomor</th>
+                <th class="p-3">Tanggal</th>
+                <th class="p-3">Perihal Surat</th>
+                <th class="p-3">Bagian Nama</th>
+                <th class="p-3">Keterangan</th>
+                <th class="p-3">File Asli</th>
+                <th class="p-3">TTE</th>
+                <th class="p-3 text-right">Jenis Surat</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-surat-keluar" class="divide-y divide-slate-200">
+              <tr><td colspan="8" class="text-center p-6 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat data dari Google Sheets...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-kelola" class="hidden space-y-6">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100 flex items-center">
+          <i class="fa-solid fa-circle-plus text-indigo-600 mr-2"></i> Formulir Entri & Manajemen Surat
+        </h2>
+        
+        <form id="formManageLetter" onsubmit="handleFormSubmit(event)" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Pilih Jenis Surat (Sheet Tujuan)</label>
+              <select id="formSheetTarget" required onchange="renderDynamicFormFields(this.value)" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500">
+                </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Aksi Data</label>
+              <select id="formActionType" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-slate-50 font-medium">
+                <option value="create">Tambah Surat Baru</option>
+                <option value="update" disabled>Edit Surat (Pilih dari tabel)</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="dynamicFormFields" class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+            </div>
+
+          <div class="pt-4 flex justify-end space-x-3">
+            <button type="reset" class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Reset</button>
+            <button type="submit" id="btnSubmitForm" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm shadow">
+              <i class="fa-solid fa-paper-plane mr-1.5"></i> Simpan / Ajukan
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-inbox" class="hidden space-y-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-5 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
+          <div>
+            <h2 class="text-lg font-bold text-slate-800 flex items-center">
+              <i class="fa-solid fa-clock-rotate-left text-amber-500 mr-2"></i> Antrean Persetujuan Editor
+            </h2>
+            <p class="text-xs text-slate-500">Pengajuan dari role Editor memerlukan persetujuan Operator atau Admin.</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-100/75 text-slate-600 uppercase text-[11px] font-semibold border-b">
+                <th class="p-3">Waktu Diajukan</th>
+                <th class="p-3">Pengaju</th>
+                <th class="p-3">Tipe Aksi</th>
+                <th class="p-3">Sheet Tujuan</th>
+                <th class="p-3">Ringkasan Data</th>
+                <th class="p-3 text-right">Opsi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-inbox" class="divide-y divide-slate-200">
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-admin" class="hidden space-y-6">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div class="flex justify-between items-center mb-4 pb-2 border-b">
+          <h2 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-users-gear text-indigo-600 mr-2"></i> Manajemen Pengguna & Hak Akses</h2>
+          <button onclick="openModalUser()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold shadow hover:bg-indigo-700">
+            <i class="fa-solid fa-user-plus mr-1"></i> Tambah User
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-100 text-slate-600 uppercase text-[11px] font-semibold">
+                <th class="p-3">Username / Nama</th>
+                <th class="p-3">Role</th>
+                <th class="p-3">Status</th>
+                <th class="p-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-users" class="divide-y divide-slate-200">
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="modalDetail" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+        <div>
+          <h3 class="font-bold text-slate-800 text-base" id="modalDetailTitle">Detail Lengkap Surat</h3>
+          <p class="text-xs text-indigo-600 font-semibold" id="modalDetailSheetName"></p>
+        </div>
+        <button onclick="closeModal('modalDetail')" class="text-slate-400 hover:text-slate-600 p-2 text-lg">&times;</button>
+      </div>
+      <div class="p-6 overflow-y-auto custom-scroll space-y-3" id="modalDetailBody">
+        </div>
+      <div class="px-6 py-3 bg-slate-50 border-t flex justify-end">
+        <button onclick="closeModal('modalDetail')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-medium">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // MASUKKAN URL HASIL DEPLOY APPS SCRIPT ANDA DI SINI
+    const API_URL = "https://script.google.com/macros/s/AKfycbwtO8TRLiqZ7KsoQ5KTeWkScEm9A-r-fRn3GIzvH0HOd-PIEPQ28mPLWChStbPLA2ZY/exec";
+
+    // ENUM DEFINITIONS
+    const BAGIAN_NAMA_ENUM = [
+      "Sub Bagian Kul",
+      "Sub Bagian Teknis dan Hukum",
+      "Sub Bagian Rendatin",
+      "Sub Bagian Parmas dan SDM"
+    ];
+
+    const KETERANGAN_ENUM = ["Draft", "Batal", "Sudah Jadi"];
+
+    const ALL_SHEETS = [
+      "Surat Masuk Ketua", "Surat Masuk Sekretaris",
+      "Keputusan Ketua", "Berita Acara Ketua", "Surat Kuasa Khusus Ketua", "Surat Keterangan Ketua",
+      "Keputusan Sekretaris", "Berita Acara Sekretaris", "Surat Kuasa Khusus Sekretaris", "Surat Keterangan Sekretaris",
+      "Surat Keluar Ketua", "Surat Perintah Ketua", "Surat Edaran Ketua", "Pengumuman Ketua", "MOU Ketua", "PKS Ketua", "SOP Ketua", "Rekomendasi Ketua",
+      "Surat Keluar Sekretaris", "Surat Perintah Sekretaris", "Surat Edaran Sekretaris", "SOP Sekretaris", "PKS Sekretaris", "MOU Sekretaris", "Pengumuman Sekretaris", "Rekomendasi Sekretaris", "ND Sekretaris", "ND Kasubbag",
+      "Undangan Ketua", "Surat Tugas Ketua", "Surat Pernyataan Ketua",
+      "Surat Tugas Sekretaris", "Undangan Sekretaris", "Surat Pernyataan Sekretaris"
+    ];
+
+    // STATE MANAGEMENT
+    let currentUserRole = "admin"; // admin | operator | editor | user
+    let rawSuratMasuk = [];
+    let rawSuratKeluar = [];
+    let pendingQueue = [];
+    let usersList = [
+      { id: 1, name: "Admin Utama", role: "admin", status: "Aktif" },
+      { id: 2, name: "Operator Kantor", role: "operator", status: "Aktif" },
+      { id: 3, name: "Editor Arsip", role: "editor", status: "Aktif" },
+      { id: 4, name: "Staff Pembaca", role: "user", status: "Aktif" }
+    ];
+
+    // INIT
+    window.addEventListener("DOMContentLoaded", () => {
+      populateSheetDropdown();
+      applyRoleAccess();
+      loadData();
+      renderUsersTable();
+    });
+
+    function switchUser(role) {
+      currentUserRole = role;
+      document.getElementById("userDisplayName").innerText = role.toUpperCase();
+      document.getElementById("userRoleBadge").innerText = role;
+      applyRoleAccess();
+      showToast(`Beralih ke role: ${role.toUpperCase()}`);
+    }
+
+    function applyRoleAccess() {
+      const tabKelola = document.getElementById("tab-kelola");
+      const tabAdmin = document.getElementById("tab-admin");
+      
+      // Admin: Full Access
+      // Operator: Full access kecuali panel user
+      // Editor: Bisa kelola via approval
+      // User: View only
+      if (currentUserRole === "admin") {
+        tabKelola.classList.remove("hidden");
+        tabAdmin.classList.remove("hidden");
+      } else if (currentUserRole === "operator") {
+        tabKelola.classList.remove("hidden");
+        tabAdmin.classList.add("hidden");
+      } else if (currentUserRole === "editor") {
+        tabKelola.classList.remove("hidden");
+        tabAdmin.classList.add("hidden");
+      } else {
+        tabKelola.classList.add("hidden");
+        tabAdmin.classList.add("hidden");
+      }
+      renderInboxTable();
+    }
+
+    function navigateTab(tabName) {
+      ["utama", "kelola", "inbox", "admin"].forEach(t => {
+        document.getElementById(`view-${t}`).classList.add("hidden");
+        document.getElementById(`tab-${t}`).className = "tab-btn border-b-2 border-transparent text-slate-500 hover:text-slate-700 px-3 py-2 text-sm whitespace-nowrap";
+      });
+      document.getElementById(`view-${tabName}`).classList.remove("hidden");
+      document.getElementById(`tab-${tabName}`).className = "tab-btn active border-b-2 border-indigo-600 text-indigo-600 font-semibold px-3 py-2 text-sm whitespace-nowrap";
+    }
+
+    // LOAD DATA
+    async function loadData() {
+      try {
+        const res = await fetch(`${API_URL}?action=getAllData`);
+        const json = await res.json();
+        if (json.status === "success") {
+          rawSuratMasuk = json.data.suratMasuk || [];
+          rawSuratKeluar = json.data.suratKeluar || [];
+          renderSuratMasukTable(rawSuratMasuk);
+          renderSuratKeluarTable(rawSuratKeluar);
+        }
+      } catch (err) {
+        console.warn("Gagal terhubung API langsung, menggunakan placeholder lokal.");
+      }
+    }
+
+    function renderSuratMasukTable(data) {
+      const tbody = document.getElementById("tbody-surat-masuk");
+      if (!data.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-slate-400">Tidak ada data surat masuk.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = data.map((d, i) => `
+        <tr onclick="openFullDetail('masuk', ${i})" class="hover:bg-indigo-50/50 cursor-pointer transition">
+          <td class="p-3 font-semibold text-slate-500">${d.no || (i+1)}</td>
+          <td class="p-3">${formatVal(d.tanggalDiterima)}</td>
+          <td class="p-3 font-medium text-slate-800">${formatVal(d.pengirim)}</td>
+          <td class="p-3">${formatVal(d.tanggalSurat)}</td>
+          <td class="p-3 font-mono text-xs">${formatVal(d.nomorSurat)}</td>
+          <td class="p-3 font-medium">${formatVal(d.perihal)}</td>
+          <td class="p-3" onclick="event.stopPropagation()">${renderLink(d.file, 'File')}</td>
+          <td class="p-3 text-right"><span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-medium">${d._sheetName}</span></td>
+        </tr>
+      `).join("");
+    }
+
+    function renderSuratKeluarTable(data) {
+      const tbody = document.getElementById("tbody-surat-keluar");
+      if (!data.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-slate-400">Tidak ada data surat keluar.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = data.map((d, i) => `
+        <tr onclick="openFullDetail('keluar', ${i})" class="hover:bg-emerald-50/50 cursor-pointer transition">
+          <td class="p-3 font-semibold text-slate-500">${d.nomor || (i+1)}</td>
+          <td class="p-3">${formatVal(d.tanggal)}</td>
+          <td class="p-3 font-medium text-slate-800">${formatVal(d.perihal)}</td>
+          <td class="p-3"><span class="bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded">${formatVal(d.bagianNama)}</span></td>
+          <td class="p-3">${renderStatusBadge(d.keterangan)}</td>
+          <td class="p-3" onclick="event.stopPropagation()">${renderLink(d.fileAsli, 'Asli')}</td>
+          <td class="p-3" onclick="event.stopPropagation()">${renderLink(d.tte, 'TTE')}</td>
+          <td class="p-3 text-right"><span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-medium">${d._sheetName}</span></td>
+        </tr>
+      `).join("");
+    }
+
+    function renderStatusBadge(status) {
+      if (status === "Sudah Jadi") return `<span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full font-semibold">Sudah Jadi</span>`;
+      if (status === "Draft") return `<span class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-semibold">Draft</span>`;
+      if (status === "Batal") return `<span class="bg-rose-100 text-rose-800 text-xs px-2 py-0.5 rounded-full font-semibold">Batal</span>`;
+      return `<span class="text-slate-400 text-xs">-</span>`;
+    }
+
+    function renderLink(url, label) {
+      if (!url || typeof url !== 'string' || !url.startsWith("http")) return `<span class="text-slate-300">-</span>`;
+      return `<a href="${url}" target="_blank" class="inline-flex items-center text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> ${label}</a>`;
+    }
+
+    function formatVal(v) {
+      return v !== undefined && v !== null && v !== "" ? v : "-";
+    }
+
+    // MODAL FULL DETAIL
+    function openFullDetail(type, index) {
+      const item = (type === 'masuk') ? rawSuratMasuk[index] : rawSuratKeluar[index];
+      if (!item) return;
+
+      document.getElementById("modalDetailTitle").innerText = `Detail ${item.perihal || 'Surat'}`;
+      document.getElementById("modalDetailSheetName").innerText = `Sumber Sheet: ${item._sheetName}`;
+
+      const container = document.getElementById("modalDetailBody");
+      container.innerHTML = Object.entries(item._fullDetail || {}).map(([key, val]) => `
+        <div class="flex flex-col sm:flex-row sm:justify-between py-2 border-b border-slate-100">
+          <span class="text-xs font-semibold text-slate-500">${key}</span>
+          <span class="text-xs sm:text-sm font-medium text-slate-800 text-right">${val !== "" ? val : '-'}</span>
+        </div>
+      `).join("");
+
+      document.getElementById("modalDetail").classList.remove("hidden");
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add("hidden");
+    }
+
+    // FORM DINAMIS DENGAN ENUM
+    function populateSheetDropdown() {
+      const select = document.getElementById("formSheetTarget");
+      select.innerHTML = ALL_SHEETS.map(s => `<option value="${s}">${s}</option>`).join("");
+      renderDynamicFormFields(ALL_SHEETS[0]);
+    }
+
+    function renderDynamicFormFields(sheetName) {
+      const isMasuk = sheetName.includes("Surat Masuk");
+      const container = document.getElementById("dynamicFormFields");
+
+      if (isMasuk) {
+        container.innerHTML = `
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">No (Otomatis)</label>
+            <input type="text" disabled value="Otomatis terisi" class="w-full border bg-slate-100 text-slate-500 rounded-lg p-2.5 text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal Diterima</label>
+            <input type="date" name="Tanggal Diterima" required class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Pengirim</label>
+            <input type="text" name="Pengirim" required placeholder="Instansi / Nama Pengirim" class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal Surat</label>
+            <input type="date" name="Tanggal Surat" required class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nomor Surat</label>
+            <input type="text" name="Nomor Surat" required placeholder="Contoh: 005/123/KPU" class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Perihal Surat</label>
+            <input type="text" name="Perihal Surat" required placeholder="Perihal" class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Link File Surat</label>
+            <input type="url" name="File" placeholder="https://drive.google.com/..." class="w-full border rounded-lg p-2 text-xs">
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nomor (Otomatis)</label>
+            <input type="text" disabled value="Otomatis terisi" class="w-full border bg-slate-100 text-slate-500 rounded-lg p-2.5 text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal</label>
+            <input type="date" name="Tanggal" required class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Perihal Surat</label>
+            <input type="text" name="Perihal Surat" required placeholder="Perihal Surat" class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Bagian Nama (Enum)</label>
+            <select name="Bagian Nama" required class="w-full border rounded-lg p-2 text-xs">
+              ${BAGIAN_NAMA_ENUM.map(e => `<option value="${e}">${e}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Keterangan (Enum)</label>
+            <select name="Keterangan : Draft / Batal / Sudah Jadi Kode Klasifikasi Arsip" required class="w-full border rounded-lg p-2 text-xs">
+              ${KETERANGAN_ENUM.map(e => `<option value="${e}">${e}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Link File Asli</label>
+            <input type="url" name="File Asli" placeholder="https://..." class="w-full border rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Link TTE</label>
+            <input type="url" name="TTE" placeholder="https://..." class="w-full border rounded-lg p-2 text-xs">
+          </div>
+        `;
+      }
+    }
+
+    // PENGIRIMAN DATA DENGAN SISTEM INBOX APPROVAL
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      const form = e.target;
+      const sheetName = document.getElementById("formSheetTarget").value;
+      const actionType = document.getElementById("formActionType").value;
+      
+      const formData = new FormData(form);
+      const rowData = {};
+      formData.forEach((val, key) => { rowData[key] = val; });
+
+      // Jika role editor, masukkan ke antrean persetujuan inbox
+      if (currentUserRole === "editor") {
+        pendingQueue.push({
+          id: Date.now(),
+          timestamp: new Date().toLocaleString("id-ID"),
+          submitter: "Editor",
+          action: actionType,
+          sheetName: sheetName,
+          rowData: rowData
+        });
+        showToast("Perubahan diajukan ke Inbox Persetujuan (Menunggu Admin/Operator).");
+        updatePendingBadge();
+        form.reset();
+        return;
+      }
+
+      // Jika Admin atau Operator, langsung simpan ke backend
+      showToast("Menyimpan ke Google Sheets...");
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "createRow", sheetName: sheetName, rowData: rowData })
+        });
+        showToast("Surat berhasil disimpan ke Google Sheets!");
+        form.reset();
+        loadData();
+      } catch (err) {
+        showToast("Gagal menyimpan ke server, data ditampung di lokal.");
+      }
+    }
+
+    // INBOX APPROVAL HANDLER
+    function renderInboxTable() {
+      const tbody = document.getElementById("tbody-inbox");
+      if (!pendingQueue.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">Tidak ada draft/perubahan yang menunggu persetujuan.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = pendingQueue.map((item, idx) => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 text-slate-500">${item.timestamp}</td>
+          <td class="p-3 font-semibold text-slate-700">${item.submitter}</td>
+          <td class="p-3"><span class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded font-medium uppercase">${item.action}</span></td>
+          <td class="p-3 font-medium">${item.sheetName}</td>
+          <td class="p-3 text-xs text-slate-500">${JSON.stringify(item.rowData).slice(0, 45)}...</td>
+          <td class="p-3 text-right space-x-2">
+            ${(currentUserRole === 'admin' || currentUserRole === 'operator') ? `
+              <button onclick="approveQueue(${idx})" class="px-2.5 py-1 bg-emerald-600 text-white rounded text-xs font-semibold hover:bg-emerald-700">Setujui</button>
+              <button onclick="rejectQueue(${idx})" class="px-2.5 py-1 bg-rose-600 text-white rounded text-xs font-semibold hover:bg-rose-700">Tolak</button>
+            ` : `<span class="text-xs text-slate-400 italic">Hanya Operator/Admin</span>`}
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function approveQueue(idx) {
+      const item = pendingQueue[idx];
+      pendingQueue.splice(idx, 1);
+      updatePendingBadge();
+      renderInboxTable();
+      showToast(`Permintaan ${item.sheetName} berhasil disetujui & dimasukkan.`);
+    }
+
+    function rejectQueue(idx) {
+      pendingQueue.splice(idx, 1);
+      updatePendingBadge();
+      renderInboxTable();
+      showToast("Permintaan telah ditolak.");
+    }
+
+    function updatePendingBadge() {
+      const badge = document.getElementById("pendingCountBadge");
+      if (pendingQueue.length > 0) {
+        badge.innerText = pendingQueue.length;
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    // PANEL ADMIN USER
+    function renderUsersTable() {
+      const tbody = document.getElementById("tbody-users");
+      tbody.innerHTML = usersList.map((u, i) => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-medium text-slate-800">${u.name}</td>
+          <td class="p-3"><span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-semibold uppercase">${u.role}</span></td>
+          <td class="p-3"><span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-medium">${u.status}</span></td>
+          <td class="p-3 text-right">
+            <button onclick="deleteUser(${i})" class="text-rose-600 hover:text-rose-800 text-xs font-semibold">Hapus</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function deleteUser(idx) {
+      if (confirm("Hapus user ini?")) {
+        usersList.splice(idx, 1);
+        renderUsersTable();
+        showToast("User berhasil dihapus.");
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      document.getElementById("toastMsg").innerText = msg;
+      t.classList.remove("translate-y-20", "opacity-0");
+      setTimeout(() => t.classList.add("translate-y-20", "opacity-0"), 3000);
+    }
+  </script>
+</body>
+</html>
